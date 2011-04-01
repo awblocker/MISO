@@ -172,25 +172,34 @@ def flag_to_strand(flag):
     return "-"
 
 
-def pair_sam_reads(samfile, filter_reads=True):
+def pair_sam_reads(samfile, filter_reads=True,
+                   return_unpaired=False):
     """
     Pair reads from a SAM file together.
     """
-    print "Pairing SAM reads..."
-    
+#    print "Pairing SAM reads..."
     paired_reads = defaultdict(list)
+    unpaired_reads = {}
 
     for read in samfile:
+        curr_name = read.qname
+        
         if filter_reads:
             # Skip reads that failed QC or are unmapped
             if read.is_qcfail or read.is_unmapped or \
                read.mate_is_unmapped or (not read.is_paired):
+                unpaired_reads[curr_name] = read
                 continue
-        paired_reads[read.qname].append(read)
+        paired_reads[curr_name].append(read)
 
-    # Sanity check:
+    to_delete = []
+
+    num_unpaired = 0
+
     for read_name, read in paired_reads.iteritems():
         if len(read) != 2:
+            unpaired_reads[read_name] = read
+            num_unpaired += 1
             continue
         left_read, right_read = read[0], read[1]
 
@@ -200,11 +209,23 @@ def pair_sam_reads(samfile, filter_reads=True):
 
         if left_strand == right_strand:
             # Skip read pairs that are on the same strand
+            to_delete.append(read_name)
             continue
         
         if left_read.pos > right_read.pos:
             raise Exception, (left_read.qname, left_read.pos, right_read.pos)
-    return paired_reads
+
+    # Delete reads that are on the same strand
+    for del_key in to_delete:
+        del paired_reads[del_key]
+
+    print "Filtered out %d read pairs that were on same strand." %(len(to_delete))
+    print "Filtered out %d reads that had no paired mate." %(num_unpaired)
+
+    if not return_unpaired:
+        return paired_reads
+    else:
+        return paired_reads, unpaired_reads
 
 
 def sam_pe_reads_to_isoforms(samfile, gene):
@@ -220,6 +241,8 @@ def sam_pe_reads_to_isoforms(samfile, gene):
 
     pe_reads = []
 
+    k = 0
+
     for read_id, read_pair in paired_reads.iteritems():
         if len(read_pair) != 2:
             # Skip reads with no pair
@@ -231,6 +254,10 @@ def sam_pe_reads_to_isoforms(samfile, gene):
         if any(array(alignment) == 1):
             pe_reads.append([alignment, frag_lens])
             num_read_pairs += 1
+        else:
+            k += 1
+
+    print "Filtered out %d reads that were not consistent with any isoform" %(k)
 
     return pe_reads, num_read_pairs
 

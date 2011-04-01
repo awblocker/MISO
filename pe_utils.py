@@ -28,8 +28,9 @@ def load_insert_dist(insert_dist_filename):
     # if len(insert_filename) == 0:
     #     raise Exception, "No insert length file found in %s." %(insert_dir)
 
-    
-def compute_insert_len(bam_filename, gff_filename, output_dir, min_exon_size):
+
+def compute_insert_len(bam_filename, gff_filename, output_dir,
+                       min_exon_size):
     """
     Compute insert length distribution and output it to the given
     directory.
@@ -59,6 +60,8 @@ def compute_insert_len(bam_filename, gff_filename, output_dir, min_exon_size):
     insert_lengths = []
 
     t1 = time.time()
+
+    relevant_region = 0
     
     for gene_id, gene_info in gff_genes.iteritems():
         gene_obj = gene_info["gene_object"]
@@ -84,6 +87,9 @@ def compute_insert_len(bam_filename, gff_filename, output_dir, min_exon_size):
 
                 if num_paired_reads == 0:
                     continue
+
+                print "Found %d region" %(relevant_region)
+                relevant_region += 1
 
                 # Compute the insert length of each read
                 for read_pair_id, read_pair in paired_reads.iteritems():
@@ -118,10 +124,7 @@ def main():
                       "and an output directory.")
     parser.add_option("--min-exon-size", dest="min_exon_size", nargs=1, type="int", default=500,
                       help="Minimum size of constitutive exon (in nucleotides) that should be used "
-                      "in the computation.  Default is 500.")
-    parser.add_option("--summarize-insert-len", dest="summarize_insert_load", nargs=2, default=None,
-                      help="Summarize the insert length that was computed. Takes as input "
-                      "the directory with the insert length distribution, and an output directory")
+                      "in the computation.  Default is 500 bp.")
     (options, args) = parser.parse_args()
 
     if options.compute_insert_len != None:
